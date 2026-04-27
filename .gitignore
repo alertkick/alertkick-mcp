@@ -1,0 +1,21 @@
+# Binary
+akmcp
+*.exe
+
+# Build
+dist/
+
+# Config with secrets
+.env
+config.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
