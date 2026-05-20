@@ -81,7 +81,7 @@ Environment variables take priority over the config file.
 ### Security Events
 | Tool | Description |
 |------|-------------|
-| `list_security_events` | List eBPF/Falco security detections with filters |
+| `list_security_events` | List eBPF security detections with filters |
 | `get_security_event_stats` | Get aggregate security event statistics |
 
 ### Monitors

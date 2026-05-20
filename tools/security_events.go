@@ -28,7 +28,7 @@ type getSecurityEventStatsInput struct {
 func RegisterSecurityEventTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_security_events",
-		Description: "List security events (eBPF/Falco detections) with optional filters for priority, rule, host, AI verdict, and time range.",
+		Description: "List security events (eBPF detections) with optional filters for priority, rule, host, AI verdict, and time range.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listSecurityEventsInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 500)
 		params := url.Values{}
