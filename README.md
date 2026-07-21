@@ -33,7 +33,7 @@ AI Tool (Claude Desktop / Cursor / etc.)
 }
 ```
 
-4. Restart Claude Desktop. You should see 14 AlertKick tools available.
+4. Restart Claude Desktop. You should see 21 AlertKick tools available.
 
 ### Claude Code
 
@@ -100,6 +100,17 @@ Environment variables take priority over the config file.
 |------|-------------|
 | `list_incidents` | List incidents with status/severity filters |
 | `get_incident` | Get detailed info for a specific incident |
+
+### Change Management
+| Tool | Description |
+|------|-------------|
+| `list_changes` | List change requests with status/host filters |
+| `get_change` | Get detailed info for a specific change |
+| `create_change` | Create a change request with a maintenance window and target servers |
+| `approve_change` | Approve a requested change |
+| `start_change` | Start a change, opening a maintenance window (SSH unlock) on its servers |
+| `complete_change` | Complete a change, re-locking servers and triggering FIM verification |
+| `verify_change` | Re-run FIM verification for a completed change |
 
 ## Example Prompts
 

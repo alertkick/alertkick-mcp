@@ -206,3 +206,63 @@ func (c *Client) GetIncident(uuid string) (json.RawMessage, error) {
 	err := c.doGet("/incidents/"+uuid, nil, &result)
 	return result, err
 }
+
+// Changes
+
+func (c *Client) ListChanges(status, hostUUID string, offset, limit int) (json.RawMessage, error) {
+	params := url.Values{}
+	params.Set("offset", fmt.Sprintf("%d", offset))
+	params.Set("limit", fmt.Sprintf("%d", limit))
+	if status != "" {
+		params.Set("status", status)
+	}
+	if hostUUID != "" {
+		params.Set("host_uuid", hostUUID)
+	}
+	var result json.RawMessage
+	err := c.doGet("/changes/all", params, &result)
+	return result, err
+}
+
+func (c *Client) GetChange(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doGet("/changes/"+uuid, nil, &result)
+	return result, err
+}
+
+func (c *Client) CreateChange(title, description, windowStart, windowEnd string, hostUUIDs []string) (json.RawMessage, error) {
+	body := map[string]interface{}{
+		"title":        title,
+		"description":  description,
+		"window_start": windowStart,
+		"window_end":   windowEnd,
+		"host_uuids":   hostUUIDs,
+	}
+	var result json.RawMessage
+	err := c.doJSON("POST", "/changes/create", body, &result)
+	return result, err
+}
+
+func (c *Client) ApproveChange(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/changes/"+uuid+"/approve", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) StartChange(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/changes/"+uuid+"/start", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) CompleteChange(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/changes/"+uuid+"/complete", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) VerifyChange(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/changes/"+uuid+"/verify", map[string]interface{}{}, &result)
+	return result, err
+}

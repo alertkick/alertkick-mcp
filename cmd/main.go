@@ -56,6 +56,7 @@ func main() {
 	tools.RegisterMonitorTools(server, apiClient)
 	tools.RegisterHeartbeatTools(server, apiClient)
 	tools.RegisterIncidentTools(server, apiClient)
+	tools.RegisterChangeTools(server, apiClient)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
