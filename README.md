@@ -33,7 +33,7 @@ AI Tool (Claude Desktop / Cursor / etc.)
 }
 ```
 
-4. Restart Claude Desktop. You should see 21 AlertKick tools available.
+4. Restart Claude Desktop. You should see 30 AlertKick tools available.
 
 ### Claude Code
 
@@ -89,11 +89,20 @@ Environment variables take priority over the config file.
 |------|-------------|
 | `list_monitors` | List HTTP/TCP/DNS/SSL monitors |
 | `get_monitor` | Get detailed info for a specific monitor |
+| `create_monitor` | Create an uptime monitor (http, api, dns, tcp, or domain expiry) |
+| `pause_monitor` | Pause a monitor's checks and alerting |
+| `resume_monitor` | Resume a paused monitor |
+| `delete_monitor` | Permanently delete a monitor |
 
 ### Heartbeats
 | Tool | Description |
 |------|-------------|
 | `list_heartbeats` | List heartbeat monitors for cron jobs |
+| `get_heartbeat` | Get a heartbeat's configuration, ping key, and health |
+| `create_heartbeat` | Create a heartbeat for a cron job (idempotent by slug) and get its ping command |
+| `enable_heartbeat` | Enable a disabled heartbeat |
+| `disable_heartbeat` | Disable a heartbeat's alerting |
+| `delete_heartbeat` | Permanently delete a heartbeat |
 
 ### Incidents
 | Tool | Description |
@@ -119,6 +128,9 @@ Environment variables take priority over the config file.
 - "What security events happened in the last hour?"
 - "Acknowledge alert abc-123"
 - "Give me a summary of my monitoring infrastructure"
+- "Set up a heartbeat for my nightly backup cron job"
+- "Monitor https://example.com and alert if the TLS cert is close to expiry"
+- "Watch example.com for domain registration expiry"
 
 ## Build from Source
 

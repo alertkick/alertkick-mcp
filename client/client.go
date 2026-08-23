@@ -173,6 +173,32 @@ func (c *Client) GetMonitor(uuid string) (json.RawMessage, error) {
 	return result, err
 }
 
+// Monitor write operations
+
+func (c *Client) CreateMonitor(payload map[string]interface{}) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/monitors/create", payload, &result)
+	return result, err
+}
+
+func (c *Client) PauseMonitor(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/monitors/"+uuid+"/pause", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) ResumeMonitor(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/monitors/"+uuid+"/resume", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) DeleteMonitor(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("DELETE", "/monitors/"+uuid, nil, &result)
+	return result, err
+}
+
 // Heartbeats
 
 func (c *Client) ListHeartbeats(offset, limit int) (json.RawMessage, error) {
@@ -182,6 +208,68 @@ func (c *Client) ListHeartbeats(offset, limit int) (json.RawMessage, error) {
 	var result json.RawMessage
 	err := c.doGet("/heartbeats/all", params, &result)
 	return result, err
+}
+
+func (c *Client) GetHeartbeat(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doGet("/heartbeats/"+uuid, nil, &result)
+	return result, err
+}
+
+// AutoPingResponse mirrors the API's auto-provisioning ping response.
+type AutoPingResponse struct {
+	Message string `json:"message"`
+	Status  string `json:"status"`
+	UUID    string `json:"uuid"`
+	Slug    string `json:"slug"`
+	Created bool   `json:"created"`
+}
+
+// AutoPingHeartbeat pings /hb/auto/{slug}, creating the heartbeat on
+// first ping. interval/grace/name apply only when it is created.
+func (c *Client) AutoPingHeartbeat(slug string, intervalSeconds, graceSeconds int, name string) (*AutoPingResponse, error) {
+	params := url.Values{}
+	if intervalSeconds > 0 {
+		params.Set("interval", fmt.Sprintf("%d", intervalSeconds))
+	}
+	if graceSeconds > 0 {
+		params.Set("grace", fmt.Sprintf("%d", graceSeconds))
+	}
+	if name != "" {
+		params.Set("name", name)
+	}
+	path := "/hb/auto/" + url.PathEscape(slug)
+	if len(params) > 0 {
+		path = path + "?" + params.Encode()
+	}
+	var result AutoPingResponse
+	err := c.doJSON("GET", path, nil, &result)
+	return &result, err
+}
+
+func (c *Client) EnableHeartbeat(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/heartbeats/"+uuid+"/enable", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) DisableHeartbeat(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/heartbeats/"+uuid+"/disable", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) DeleteHeartbeat(uuid string) (json.RawMessage, error) {
+	body := map[string]interface{}{"uuid": uuid}
+	var result json.RawMessage
+	err := c.doJSON("POST", "/heartbeats/delete", body, &result)
+	return result, err
+}
+
+// BaseURL returns the API base URL (including /api/v1), for composing
+// ping command examples in tool output.
+func (c *Client) BaseURL() string {
+	return c.baseURL
 }
 
 // Incidents

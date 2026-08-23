@@ -21,6 +21,20 @@ func textResult(text string) (*mcp.CallToolResult, any, error) {
 	}, nil, nil
 }
 
+func defaultInt(value, defaultVal int) int {
+	if value <= 0 {
+		return defaultVal
+	}
+	return value
+}
+
+func defaultString(value, defaultVal string) string {
+	if value == "" {
+		return defaultVal
+	}
+	return value
+}
+
 func clampLimit(limit, defaultVal, maxVal int) int {
 	if limit <= 0 {
 		return defaultVal
