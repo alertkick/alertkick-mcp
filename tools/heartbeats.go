@@ -101,6 +101,7 @@ Or ping by slug with the account API key (also creates the heartbeat if missing)
 
   curl -fsS -H "X-API-Key: $ALERTKICK_API_KEY" "%s/hb/auto/%s"`,
 			in.Slug, verb, string(data), hb.APIKey, c.PublicBaseURL(), autoPing.UUID, c.PublicBaseURL(), autoPing.Slug)
+		text += fmt.Sprintf("\n\nView it in AlertKick: %s/heartbeats/show/%s", c.PublicUIBaseURL(), autoPing.UUID)
 		return textResult(text)
 	})
 

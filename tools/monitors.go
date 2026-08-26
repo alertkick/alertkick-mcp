@@ -46,7 +46,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to list monitors: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -61,7 +61,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to get monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -128,7 +128,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -146,7 +146,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to pause monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -164,7 +164,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to resume monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -182,6 +182,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to delete monitor: " + err.Error())
 		}
+		// No UI link here on purpose: the monitor no longer exists.
 		return textResult(string(data))
 	})
 }

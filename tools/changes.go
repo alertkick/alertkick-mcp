@@ -95,7 +95,7 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create change: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/change/show/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{

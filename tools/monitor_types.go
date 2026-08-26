@@ -94,7 +94,7 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -130,7 +130,7 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create DNS monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -158,7 +158,7 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create domain-expiry monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -191,6 +191,6 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create TCP monitor: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
 }

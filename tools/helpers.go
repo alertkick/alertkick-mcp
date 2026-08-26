@@ -2,6 +2,8 @@ package tools
 
 import (
 	"alertkick-mcp/client"
+	"encoding/json"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -95,4 +97,18 @@ func annWrite(title string, destructive, idempotent bool) *mcp.ToolAnnotations {
 		IdempotentHint:  idempotent,
 		OpenWorldHint:   &f,
 	}
+}
+
+// uiLinkLine builds a "view it in AlertKick" suffix for create-tool
+// results: every resource created through an assistant should hand the
+// user a doorway into the web UI. Returns "" when no uuid can be found in
+// the response (never fails the tool call over a link).
+func uiLinkLine(c *client.Client, data []byte, pathPrefix string) string {
+	var resp struct {
+		UUID string `json:"uuid"`
+	}
+	if err := json.Unmarshal(data, &resp); err != nil || resp.UUID == "" {
+		return ""
+	}
+	return fmt.Sprintf("\n\nView it in AlertKick: %s%s%s", c.PublicUIBaseURL(), pathPrefix, resp.UUID)
 }

@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -402,4 +403,10 @@ func (c *Client) VerifyChange(uuid string) (json.RawMessage, error) {
 	var result json.RawMessage
 	err := c.doJSON("POST", "/changes/"+uuid+"/verify", map[string]interface{}{}, &result)
 	return result, err
+}
+
+// PublicUIBaseURL returns the user-facing web UI base URL (no /api/v1),
+// for "view it in AlertKick" links in tool output.
+func (c *Client) PublicUIBaseURL() string {
+	return strings.TrimSuffix(c.PublicBaseURL(), "/api/v1")
 }
