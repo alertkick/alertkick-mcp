@@ -31,6 +31,7 @@ var heartbeatSlugPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$
 func RegisterHeartbeatTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_heartbeats",
+		Annotations: annReadOnly("List heartbeats"),
 		Description: "List all heartbeat monitors. Heartbeats track cron jobs and scheduled tasks by expecting periodic pings.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listHeartbeatsInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 200)
@@ -43,6 +44,7 @@ func RegisterHeartbeatTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_heartbeat",
+		Annotations: annReadOnly("Get heartbeat"),
 		Description: "Get a heartbeat's full configuration and state, including its ping key and current health.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getHeartbeatInput) (*mcp.CallToolResult, any, error) {
 		if in.UUID == "" {
@@ -57,8 +59,12 @@ func RegisterHeartbeatTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_heartbeat",
+		Annotations: annWrite("Create heartbeat", false, true),
 		Description: "Create a heartbeat monitor for a cron job or scheduled task. Idempotent by slug: if a heartbeat with this slug exists it is pinged instead of duplicated. Creation records a first ping and arms monitoring immediately, so the next real ping is expected within interval_seconds + grace_seconds. Returns the ping command to embed in the job.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in createHeartbeatInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.Slug == "" {
 			return errorResult("slug is required")
 		}
@@ -94,14 +100,18 @@ Ping it from the job using its scoped key (safe to embed in scripts, valid only 
 Or ping by slug with the account API key (also creates the heartbeat if missing):
 
   curl -fsS -H "X-API-Key: $ALERTKICK_API_KEY" "%s/hb/auto/%s"`,
-			in.Slug, verb, string(data), hb.APIKey, c.BaseURL(), autoPing.UUID, c.BaseURL(), autoPing.Slug)
+			in.Slug, verb, string(data), hb.APIKey, c.PublicBaseURL(), autoPing.UUID, c.PublicBaseURL(), autoPing.Slug)
 		return textResult(text)
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "enable_heartbeat",
+		Annotations: annWrite("Enable heartbeat", true, true),
 		Description: "Enable a disabled heartbeat so missed pings alert again.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getHeartbeatInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -114,8 +124,12 @@ Or ping by slug with the account API key (also creates the heartbeat if missing)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "disable_heartbeat",
+		Annotations: annWrite("Disable heartbeat", true, true),
 		Description: "Disable a heartbeat so missed pings stop alerting (e.g. while the job is intentionally stopped).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getHeartbeatInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -128,8 +142,12 @@ Or ping by slug with the account API key (also creates the heartbeat if missing)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "delete_heartbeat",
+		Annotations: annWrite("Delete heartbeat", true, true),
 		Description: "Permanently delete a heartbeat monitor. Its ping URL stops working.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getHeartbeatInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}

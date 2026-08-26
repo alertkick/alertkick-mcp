@@ -23,6 +23,7 @@ type getServerContainersInput struct {
 func RegisterServerTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_servers",
+		Annotations: annReadOnly("List servers"),
 		Description: "List all monitored servers with their status, hostname, IP addresses, OS info, and agent version. Supports pagination.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listServersInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 200)
@@ -35,6 +36,7 @@ func RegisterServerTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_server",
+		Annotations: annReadOnly("Get server"),
 		Description: "Get detailed information about a specific server including checks, host info, uptime, and agent details.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getServerInput) (*mcp.CallToolResult, any, error) {
 		if in.UUID == "" {
@@ -49,6 +51,7 @@ func RegisterServerTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_server_containers",
+		Annotations: annReadOnly("Get server containers"),
 		Description: "Get Docker containers running on a specific server, including status, CPU, memory, and network stats.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getServerContainersInput) (*mcp.CallToolResult, any, error) {
 		if in.UUID == "" {

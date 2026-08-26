@@ -38,6 +38,7 @@ type createMonitorInput struct {
 func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_monitors",
+		Annotations: annReadOnly("List monitors"),
 		Description: "List all HTTP/TCP/DNS/SSL monitors with their current status, response times, and check intervals.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listMonitorsInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 200)
@@ -50,6 +51,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_monitor",
+		Annotations: annReadOnly("Get monitor"),
 		Description: "Get detailed information about a specific monitor including its configuration, check history, and assigned pollers.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getMonitorInput) (*mcp.CallToolResult, any, error) {
 		if in.UUID == "" {
@@ -64,8 +66,12 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_monitor",
+		Annotations: annWrite("Create monitor", false, false),
 		Description: "Create an uptime monitor. Types: 'http'/'api' check a URL (optionally with ssl_cert_monitoring for HTTPS certificate expiry), 'dns' checks record resolution, 'tcp' checks a port, 'domain' checks domain registration expiry. Only display_name, monitor_type and url are required; sensible defaults cover the rest. Alerts route to the account's default escalation policy.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in createMonitorInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.DisplayName == "" {
 			return errorResult("display_name is required")
 		}
@@ -127,8 +133,12 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "pause_monitor",
+		Annotations: annWrite("Pause monitor", true, true),
 		Description: "Pause a monitor: checks stop and no alerts fire until it is resumed.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getMonitorInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -141,8 +151,12 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "resume_monitor",
+		Annotations: annWrite("Resume monitor", true, true),
 		Description: "Resume a paused monitor so checks and alerting start again.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getMonitorInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -155,8 +169,12 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "delete_monitor",
+		Annotations: annWrite("Delete monitor", true, true),
 		Description: "Permanently delete a monitor and stop all its checks.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getMonitorInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}

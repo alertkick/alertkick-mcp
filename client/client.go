@@ -17,6 +17,15 @@ type Client struct {
 	baseURL    string
 	apiKey     string
 	version    string
+
+	// Hosted-connector (http) mode: requests go to the internal api with
+	// the tenant addressed via Host header and the caller's OAuth access
+	// token forwarded as the credential. publicBaseURL is what we show to
+	// users (ping commands etc.) — never the internal URL.
+	bearerToken   string
+	hostOverride  string
+	publicBaseURL string
+	writeAllowed  bool
 }
 
 func NewClient(cfg *config.Config, version string) *Client {
@@ -24,11 +33,32 @@ func NewClient(cfg *config.Config, version string) *Client {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		baseURL: cfg.APIURL + "/api/v1",
-		apiKey:  cfg.APIKey,
-		version: version,
+		baseURL:      cfg.APIURL + "/api/v1",
+		apiKey:       cfg.APIKey,
+		version:      version,
+		writeAllowed: true, // stdio API keys carry the owning user's full access
 	}
 }
+
+// NewTenantClient returns a client bound to one authenticated hosted-mode
+// request: tenant from the verified token, credential = the token itself
+// (the api re-verifies it and enforces tenant + grant liveness).
+func NewTenantClient(cfg *config.Config, version, tenant, bearerToken string, writeAllowed bool) *Client {
+	return &Client{
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		baseURL:       cfg.InternalAPIURL + "/api/v1",
+		bearerToken:   bearerToken,
+		hostOverride:  tenant + "." + cfg.TenantDomain,
+		publicBaseURL: "https://" + tenant + "." + cfg.TenantDomain + "/api/v1",
+		version:       version,
+		writeAllowed:  writeAllowed,
+	}
+}
+
+// CanWrite reports whether this connection may call write tools.
+func (c *Client) CanWrite() bool { return c.writeAllowed }
 
 func (c *Client) doJSON(method, path string, body interface{}, result interface{}) error {
 	var bodyReader io.Reader
@@ -45,7 +75,16 @@ func (c *Client) doJSON(method, path string, body interface{}, result interface{
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.apiKey)
+	if c.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	} else {
+		req.Header.Set("X-API-Key", c.apiKey)
+	}
+	if c.hostOverride != "" {
+		// Tenant routing in the api is Host-based; override it while the
+		// TCP connection still goes to the internal URL.
+		req.Host = c.hostOverride
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "AlertKick-MCP/"+c.version)
 
@@ -269,6 +308,16 @@ func (c *Client) DeleteHeartbeat(uuid string) (json.RawMessage, error) {
 // BaseURL returns the API base URL (including /api/v1), for composing
 // ping command examples in tool output.
 func (c *Client) BaseURL() string {
+	return c.baseURL
+}
+
+// PublicBaseURL returns the user-facing API base URL (including /api/v1).
+// In hosted mode the request URL is internal, so anything shown to users
+// (heartbeat ping commands, links) must use this instead of BaseURL.
+func (c *Client) PublicBaseURL() string {
+	if c.publicBaseURL != "" {
+		return c.publicBaseURL
+	}
 	return c.baseURL
 }
 

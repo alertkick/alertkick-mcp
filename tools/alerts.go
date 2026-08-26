@@ -28,6 +28,7 @@ type resolveAlertInput struct {
 func RegisterAlertTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_alerts",
+		Annotations: annReadOnly("List alerts"),
 		Description: "List alerts with optional status filter. Returns alert name, status, severity, server, and timestamps.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listAlertsInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 200)
@@ -40,6 +41,7 @@ func RegisterAlertTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_alert",
+		Annotations: annReadOnly("Get alert"),
 		Description: "Get detailed information about a specific alert including its full history and associated server.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getAlertInput) (*mcp.CallToolResult, any, error) {
 		if in.UUID == "" {
@@ -54,8 +56,12 @@ func RegisterAlertTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "acknowledge_alert",
+		Annotations: annWrite("Acknowledge alerts", true, true),
 		Description: "Acknowledge an open alert. This signals that someone is aware of and working on the issue.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in acknowledgeAlertInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -68,8 +74,12 @@ func RegisterAlertTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "resolve_alert",
+		Annotations: annWrite("Resolve alerts", true, true),
 		Description: "Resolve an alert, marking the issue as fixed. The alert will re-open if the check fails again.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in resolveAlertInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}

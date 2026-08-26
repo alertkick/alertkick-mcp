@@ -3,11 +3,13 @@ package main
 import (
 	"alertkick-mcp/client"
 	"alertkick-mcp/config"
+	"alertkick-mcp/httpserver"
 	"alertkick-mcp/tools"
 	"context"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,23 +43,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Printf("akmcp %s starting (api: %s)", version, cfg.APIURL)
-
-	apiClient := client.NewClient(cfg, version)
-
-	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "alertkick-mcp",
-		Version: version,
-	}, nil)
-
-	tools.RegisterServerTools(server, apiClient)
-	tools.RegisterAlertTools(server, apiClient)
-	tools.RegisterSecurityEventTools(server, apiClient)
-	tools.RegisterMonitorTools(server, apiClient)
-	tools.RegisterHeartbeatTools(server, apiClient)
-	tools.RegisterIncidentTools(server, apiClient)
-	tools.RegisterChangeTools(server, apiClient)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -68,6 +53,28 @@ func main() {
 		log.Println("shutting down")
 		cancel()
 	}()
+
+	// Hosted multi-tenant connector: streamable HTTP + OAuth resource
+	// server behind mcp.{domain}. Selected by AKMCP_HTTP_ADDR / http_addr.
+	if cfg.HTTPMode() {
+		if err := httpserver.New(cfg, version).Run(ctx); err != nil && err != http.ErrServerClosed {
+			log.Printf("server error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Classic stdio mode: single tenant, X-API-Key.
+	log.Printf("akmcp %s starting (api: %s)", version, cfg.APIURL)
+
+	apiClient := client.NewClient(cfg, version)
+
+	server := mcp.NewServer(&mcp.Implementation{
+		Name:    "alertkick-mcp",
+		Version: version,
+	}, nil)
+
+	tools.RegisterAll(server, apiClient)
 
 	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		log.Printf("server error: %v", err)
