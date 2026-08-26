@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,15 @@ type Client struct {
 	baseURL    string
 	apiKey     string
 	version    string
+
+	// Hosted-connector (http) mode: requests go to the internal api with
+	// the tenant addressed via Host header and the caller's OAuth access
+	// token forwarded as the credential. publicBaseURL is what we show to
+	// users (ping commands etc.) — never the internal URL.
+	bearerToken   string
+	hostOverride  string
+	publicBaseURL string
+	writeAllowed  bool
 }
 
 func NewClient(cfg *config.Config, version string) *Client {
@@ -24,11 +34,32 @@ func NewClient(cfg *config.Config, version string) *Client {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		baseURL: cfg.APIURL + "/api/v1",
-		apiKey:  cfg.APIKey,
-		version: version,
+		baseURL:      cfg.APIURL + "/api/v1",
+		apiKey:       cfg.APIKey,
+		version:      version,
+		writeAllowed: true, // stdio API keys carry the owning user's full access
 	}
 }
+
+// NewTenantClient returns a client bound to one authenticated hosted-mode
+// request: tenant from the verified token, credential = the token itself
+// (the api re-verifies it and enforces tenant + grant liveness).
+func NewTenantClient(cfg *config.Config, version, tenant, bearerToken string, writeAllowed bool) *Client {
+	return &Client{
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		baseURL:       cfg.InternalAPIURL + "/api/v1",
+		bearerToken:   bearerToken,
+		hostOverride:  tenant + "." + cfg.TenantDomain,
+		publicBaseURL: "https://" + tenant + "." + cfg.TenantDomain + "/api/v1",
+		version:       version,
+		writeAllowed:  writeAllowed,
+	}
+}
+
+// CanWrite reports whether this connection may call write tools.
+func (c *Client) CanWrite() bool { return c.writeAllowed }
 
 func (c *Client) doJSON(method, path string, body interface{}, result interface{}) error {
 	var bodyReader io.Reader
@@ -45,7 +76,16 @@ func (c *Client) doJSON(method, path string, body interface{}, result interface{
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-API-Key", c.apiKey)
+	if c.bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearerToken)
+	} else {
+		req.Header.Set("X-API-Key", c.apiKey)
+	}
+	if c.hostOverride != "" {
+		// Tenant routing in the api is Host-based; override it while the
+		// TCP connection still goes to the internal URL.
+		req.Host = c.hostOverride
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "AlertKick-MCP/"+c.version)
 
@@ -173,6 +213,32 @@ func (c *Client) GetMonitor(uuid string) (json.RawMessage, error) {
 	return result, err
 }
 
+// Monitor write operations
+
+func (c *Client) CreateMonitor(payload map[string]interface{}) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/monitors/create", payload, &result)
+	return result, err
+}
+
+func (c *Client) PauseMonitor(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/monitors/"+uuid+"/pause", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) ResumeMonitor(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/monitors/"+uuid+"/resume", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) DeleteMonitor(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("DELETE", "/monitors/"+uuid, nil, &result)
+	return result, err
+}
+
 // Heartbeats
 
 func (c *Client) ListHeartbeats(offset, limit int) (json.RawMessage, error) {
@@ -182,6 +248,78 @@ func (c *Client) ListHeartbeats(offset, limit int) (json.RawMessage, error) {
 	var result json.RawMessage
 	err := c.doGet("/heartbeats/all", params, &result)
 	return result, err
+}
+
+func (c *Client) GetHeartbeat(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doGet("/heartbeats/"+uuid, nil, &result)
+	return result, err
+}
+
+// AutoPingResponse mirrors the API's auto-provisioning ping response.
+type AutoPingResponse struct {
+	Message string `json:"message"`
+	Status  string `json:"status"`
+	UUID    string `json:"uuid"`
+	Slug    string `json:"slug"`
+	Created bool   `json:"created"`
+}
+
+// AutoPingHeartbeat pings /hb/auto/{slug}, creating the heartbeat on
+// first ping. interval/grace/name apply only when it is created.
+func (c *Client) AutoPingHeartbeat(slug string, intervalSeconds, graceSeconds int, name string) (*AutoPingResponse, error) {
+	params := url.Values{}
+	if intervalSeconds > 0 {
+		params.Set("interval", fmt.Sprintf("%d", intervalSeconds))
+	}
+	if graceSeconds > 0 {
+		params.Set("grace", fmt.Sprintf("%d", graceSeconds))
+	}
+	if name != "" {
+		params.Set("name", name)
+	}
+	path := "/hb/auto/" + url.PathEscape(slug)
+	if len(params) > 0 {
+		path = path + "?" + params.Encode()
+	}
+	var result AutoPingResponse
+	err := c.doJSON("GET", path, nil, &result)
+	return &result, err
+}
+
+func (c *Client) EnableHeartbeat(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/heartbeats/"+uuid+"/enable", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) DisableHeartbeat(uuid string) (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("POST", "/heartbeats/"+uuid+"/disable", map[string]interface{}{}, &result)
+	return result, err
+}
+
+func (c *Client) DeleteHeartbeat(uuid string) (json.RawMessage, error) {
+	body := map[string]interface{}{"uuid": uuid}
+	var result json.RawMessage
+	err := c.doJSON("POST", "/heartbeats/delete", body, &result)
+	return result, err
+}
+
+// BaseURL returns the API base URL (including /api/v1), for composing
+// ping command examples in tool output.
+func (c *Client) BaseURL() string {
+	return c.baseURL
+}
+
+// PublicBaseURL returns the user-facing API base URL (including /api/v1).
+// In hosted mode the request URL is internal, so anything shown to users
+// (heartbeat ping commands, links) must use this instead of BaseURL.
+func (c *Client) PublicBaseURL() string {
+	if c.publicBaseURL != "" {
+		return c.publicBaseURL
+	}
+	return c.baseURL
 }
 
 // Incidents
@@ -265,4 +403,10 @@ func (c *Client) VerifyChange(uuid string) (json.RawMessage, error) {
 	var result json.RawMessage
 	err := c.doJSON("POST", "/changes/"+uuid+"/verify", map[string]interface{}{}, &result)
 	return result, err
+}
+
+// PublicUIBaseURL returns the user-facing web UI base URL (no /api/v1),
+// for "view it in AlertKick" links in tool output.
+func (c *Client) PublicUIBaseURL() string {
+	return strings.TrimSuffix(c.PublicBaseURL(), "/api/v1")
 }

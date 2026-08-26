@@ -28,6 +28,7 @@ type getSecurityEventStatsInput struct {
 func RegisterSecurityEventTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_security_events",
+		Annotations: annReadOnly("List security events"),
 		Description: "List security events (eBPF detections) with optional filters for priority, rule, host, AI verdict, and time range.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listSecurityEventsInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 500)
@@ -64,6 +65,7 @@ func RegisterSecurityEventTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_security_event_stats",
+		Annotations: annReadOnly("Security event stats"),
 		Description: "Get aggregate statistics for security events: counts by priority, rule, host, and AI verdict over a time range.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getSecurityEventStatsInput) (*mcp.CallToolResult, any, error) {
 		data, err := c.GetSecurityEventsStats(in.Duration)

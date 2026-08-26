@@ -45,6 +45,7 @@ type verifyChangeInput struct {
 func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_changes",
+		Annotations: annReadOnly("List change requests"),
 		Description: "List change requests with optional status and host filters. Returns change title, status, verification status, maintenance window, and affected servers.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in listChangesInput) (*mcp.CallToolResult, any, error) {
 		limit := clampLimit(in.Limit, 50, 200)
@@ -57,6 +58,7 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_change",
+		Annotations: annReadOnly("Get change request"),
 		Description: "Get detailed information about a specific change request, including its status, verification status (pending, running, clean, changes_detected, failed), maintenance window, and affected servers.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in getChangeInput) (*mcp.CallToolResult, any, error) {
 		if in.UUID == "" {
@@ -71,8 +73,12 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_change",
+		Annotations: annWrite("Create change request", false, false),
 		Description: "Create a new change request in \"requested\" status with a title, maintenance window, and target servers. host_uuids are AlertKick host UUIDs, discoverable via the list_servers tool. The change must then be approved, started, and completed via the corresponding tools.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in createChangeInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.Title == "" {
 			return errorResult("title is required")
 		}
@@ -89,13 +95,17 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 		if err != nil {
 			return errorResult("Failed to create change: " + err.Error())
 		}
-		return textResult(string(data))
+		return textResult(string(data) + uiLinkLine(c, data, "/change/show/"))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "approve_change",
+		Annotations: annWrite("Approve change request", true, true),
 		Description: "Approve a requested change, moving it to \"approved\" status so it can be started.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in approveChangeInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -108,8 +118,12 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "start_change",
+		Annotations: annWrite("Start change request", true, true),
 		Description: "Start an approved change. Side effect: this opens a maintenance window (SSH unlock) on the change's servers until the change's window end time.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in startChangeInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -122,8 +136,12 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "complete_change",
+		Annotations: annWrite("Complete change request", true, true),
 		Description: "Complete a started change. Side effect: this re-locks the change's servers (closes the maintenance window) and starts an automatic FIM verification by the SRE agent. Poll get_change to see the verification_status.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in completeChangeInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
@@ -136,8 +154,12 @@ func RegisterChangeTools(s *mcp.Server, c *client.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "verify_change",
+		Annotations: annWrite("Verify change request", true, true),
 		Description: "Re-run the FIM verification for a completed change. Returns the verification result including per-host changed-file lists.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in verifyChangeInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
 		if in.UUID == "" {
 			return errorResult("uuid is required")
 		}
