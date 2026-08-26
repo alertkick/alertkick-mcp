@@ -49,6 +49,7 @@ func (s *Server) Run(ctx context.Context) error {
 			Name:    "alertkick-mcp",
 			Version: s.version,
 		}, nil)
+		server.AddReceivingMiddleware(toolCallLogger(claims))
 		tools.RegisterAll(server, apiClient)
 		return server
 	}, &mcp.StreamableHTTPOptions{
@@ -77,7 +78,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	httpServer := &http.Server{
 		Addr:              s.cfg.HTTPAddr,
-		Handler:           withCORS(mux),
+		Handler:           withCORS(withAccessLog(mux)),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

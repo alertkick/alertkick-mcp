@@ -69,3 +69,20 @@ func TestProtectedResourceMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestAccessLogPassesStatusThrough(t *testing.T) {
+	h := withAccessLog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+		w.Write([]byte("x"))
+	}))
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.1")
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusTeapot {
+		t.Fatalf("status = %d, want 418", rr.Code)
+	}
+	if got := clientIP(req); got != "203.0.113.9" {
+		t.Fatalf("clientIP = %q, want first XFF hop", got)
+	}
+}
