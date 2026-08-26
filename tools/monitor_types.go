@@ -68,15 +68,14 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 			sslMonitoring = *in.MonitorSSLCert
 		}
 		payload := map[string]interface{}{
-			"display_name":         in.DisplayName,
-			"monitor_type":         "http",
-			"url":                  in.URL,
-			"http_method":          "GET",
-			"expected_status_code": defaultInt(in.ExpectedStatusCode, 200),
-			"ssl_cert_monitoring":  sslMonitoring,
-		}
-		if in.CheckIntervalSeconds > 0 {
-			payload["check_interval_seconds"] = in.CheckIntervalSeconds
+			"display_name":           in.DisplayName,
+			"monitor_type":           "http",
+			"url":                    in.URL,
+			"http_method":            "GET",
+			"expected_status_code":   defaultInt(in.ExpectedStatusCode, 200),
+			"ssl_cert_monitoring":    sslMonitoring,
+			"timeout_seconds":        30,
+			"check_interval_seconds": defaultInt(in.CheckIntervalSeconds, 300),
 		}
 		if in.ExpectedResponseContains != "" {
 			payload["expected_response_contains"] = in.ExpectedResponseContains
@@ -115,16 +114,15 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 			return errorResult("record_type must be one of A, AAAA, CNAME, MX, TXT, NS")
 		}
 		payload := map[string]interface{}{
-			"display_name":    in.DisplayName,
-			"monitor_type":    "dns",
-			"url":             in.Hostname,
-			"dns_record_type": recordType,
+			"display_name":           in.DisplayName,
+			"monitor_type":           "dns",
+			"url":                    in.Hostname,
+			"dns_record_type":        recordType,
+			"timeout_seconds":        30,
+			"check_interval_seconds": defaultInt(in.CheckIntervalSeconds, 300),
 		}
 		if in.ExpectedValue != "" {
 			payload["expected_dns_host"] = in.ExpectedValue
-		}
-		if in.CheckIntervalSeconds > 0 {
-			payload["check_interval_seconds"] = in.CheckIntervalSeconds
 		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
@@ -147,9 +145,11 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		domain := strings.TrimPrefix(strings.TrimPrefix(strings.ToLower(strings.TrimSpace(in.Domain)), "https://"), "http://")
 		domain = strings.TrimSuffix(strings.Split(domain, "/")[0], ".")
 		payload := map[string]interface{}{
-			"display_name": in.DisplayName,
-			"monitor_type": "domain",
-			"url":          domain,
+			"display_name":           in.DisplayName,
+			"monitor_type":           "domain",
+			"url":                    domain,
+			"timeout_seconds":        30,
+			"check_interval_seconds": 86400, // RDAP data changes daily at most
 		}
 		if in.DomainExpiryAlertDays > 0 {
 			payload["domain_expiry_alert_days"] = in.DomainExpiryAlertDays
@@ -176,13 +176,12 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 			return errorResult(fmt.Sprintf("port must be 1-65535, got %d", in.Port))
 		}
 		payload := map[string]interface{}{
-			"display_name": in.DisplayName,
-			"monitor_type": "tcp",
-			"url":          in.Host,
-			"tcp_port":     in.Port,
-		}
-		if in.CheckIntervalSeconds > 0 {
-			payload["check_interval_seconds"] = in.CheckIntervalSeconds
+			"display_name":           in.DisplayName,
+			"monitor_type":           "tcp",
+			"url":                    in.Host,
+			"tcp_port":               in.Port,
+			"timeout_seconds":        30,
+			"check_interval_seconds": defaultInt(in.CheckIntervalSeconds, 300),
 		}
 		if in.FailureThreshold > 0 {
 			payload["failure_threshold"] = in.FailureThreshold
