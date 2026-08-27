@@ -86,3 +86,31 @@ func TestAccessLogPassesStatusThrough(t *testing.T) {
 		t.Fatalf("clientIP = %q, want first XFF hop", got)
 	}
 }
+
+// Claude's connector advertises a current MCP-Protocol-Version header. The
+// SDK 400s any version it does not list, which showed up in prod as a
+// "Bad Request: Unsupported protocol version" on the FIRST POST of every
+// session before the client renegotiated down and succeeded. Pinning the
+// SDK too far behind the spec reintroduces that wasted round trip, so
+// assert every currently-published protocol version is accepted.
+func TestSupportedProtocolVersionsAreAccepted(t *testing.T) {
+	s := testServer()
+	h := s.requireAuth(s.streamableHandler())
+	token := mintTestToken(t, testKey, validClaims())
+
+	for _, version := range []string{"2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28"} {
+		body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+		req := httptest.NewRequest("POST", "/mcp", body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("MCP-Protocol-Version", version)
+
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		if rec.Code == http.StatusBadRequest && strings.Contains(rec.Body.String(), "Unsupported protocol version") {
+			t.Errorf("protocol version %s rejected: %s", version, strings.TrimSpace(rec.Body.String()))
+		}
+	}
+}
