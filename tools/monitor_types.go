@@ -42,6 +42,13 @@ type createDomainExpiryMonitorInput struct {
 	DomainExpiryAlertDays int    `json:"domain_expiry_alert_days,omitempty" jsonschema:"days before registration expiry to alert (default 30, max 365)"`
 }
 
+type createMailMonitorInput struct {
+	DisplayName          string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	Domain               string `json:"domain" jsonschema:"domain that sends or receives mail, e.g. example.com (required)"`
+	RequireDmarcPolicy   string `json:"require_dmarc_policy,omitempty" jsonschema:"minimum DMARC policy to require: none, quarantine or reject (optional; the check always fails on missing SPF/DMARC, +all, PermError or a blocklist listing)"`
+	CheckIntervalSeconds int    `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 3600)"`
+}
+
 type createTCPMonitorInput struct {
 	DisplayName          string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
 	Host                 string `json:"host" jsonschema:"hostname or IP to connect to (required)"`
@@ -189,6 +196,41 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
 			return errorResult("Failed to create TCP monitor: " + err.Error())
+		}
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
+	})
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "create_mail_monitor",
+		Annotations: annWrite("Create mail posture monitor", false, false),
+		Description: "Create an email deliverability monitor for a domain. Every check resolves MX, SPF (with the 10-lookup budget), DMARC, DKIM on common selectors, MTA-STS and TLS-RPT, and queries Spamhaus, SpamCop, Barracuda, PSBL and UCEPROTECT for every mail server address plus the Spamhaus DBL for the domain. Alerts on missing SPF or DMARC, +all, SPF PermError, a blocklist listing, or a DMARC policy weaker than require_dmarc_policy; emits events when SPF or DMARC records change or a listing appears/clears.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in createMailMonitorInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
+		if in.DisplayName == "" || in.Domain == "" {
+			return errorResult("display_name and domain are required")
+		}
+		policy := strings.ToLower(strings.TrimSpace(in.RequireDmarcPolicy))
+		switch policy {
+		case "", "none", "quarantine", "reject":
+		default:
+			return errorResult("require_dmarc_policy must be none, quarantine or reject")
+		}
+		domain := strings.TrimPrefix(strings.TrimPrefix(strings.ToLower(strings.TrimSpace(in.Domain)), "https://"), "http://")
+		domain = strings.TrimSuffix(strings.Split(domain, "/")[0], ".")
+		payload := map[string]interface{}{
+			"display_name":           in.DisplayName,
+			"monitor_type":           "mail",
+			"url":                    domain,
+			"timeout_seconds":        30,
+			"check_interval_seconds": defaultInt(in.CheckIntervalSeconds, 3600),
+		}
+		if policy != "" {
+			payload["mail_require_dmarc_policy"] = policy
+		}
+		data, err := c.CreateMonitor(payload)
+		if err != nil {
+			return errorResult("Failed to create mail monitor: " + err.Error())
 		}
 		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})
