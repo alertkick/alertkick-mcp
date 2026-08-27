@@ -51,7 +51,7 @@ AI Tool (Claude Desktop / Cursor / etc.)
     "alertkick": {
       "command": "/path/to/akmcp",
       "env": {
-        "ALERTKICK_API_KEY": "ak.your_key_here",
+        "ALERTKICK_API_KEY": "ak_your_key_here",
         "ALERTKICK_API_URL": "https://yourworkspace.alertkick.com"
       }
     }
@@ -65,7 +65,7 @@ AI Tool (Claude Desktop / Cursor / etc.)
 
 ```bash
 claude mcp add --transport stdio alertkick \
-  --env ALERTKICK_API_KEY=ak.your_key_here \
+  --env ALERTKICK_API_KEY=ak_your_key_here \
   --env ALERTKICK_API_URL=https://yourworkspace.alertkick.com \
   -- /path/to/akmcp
 ```
@@ -74,14 +74,14 @@ claude mcp add --transport stdio alertkick \
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ALERTKICK_API_KEY` | Yes (stdio mode) | — | Your API key (`ak.…`) |
+| `ALERTKICK_API_KEY` | Yes (stdio mode) | — | Your API key (`ak_…`) |
 | `ALERTKICK_API_URL` | Yes (stdio mode) | `https://app.alertkick.com` | Your workspace URL, e.g. `https://yourworkspace.alertkick.com` — API keys are workspace-scoped, so the default only works for the `app` workspace |
 
 You can also use a JSON config file with `-config path/to/config.json`:
 
 ```json
 {
-  "api_key": "ak.your_key_here",
+  "api_key": "ak_your_key_here",
   "api_url": "https://yourworkspace.alertkick.com"
 }
 ```
