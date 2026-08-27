@@ -18,3 +18,8 @@ clean:
 
 test:
 	go test ./...
+
+# Dump the tool manifest consumed by the public alertkick-webmcp package.
+.PHONY: webmcp-manifest
+webmcp-manifest:
+	go run -ldflags "-X main.version=$(VERSION)" ./cmd/webmcp-manifest > webmcp-manifest.json
