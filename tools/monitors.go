@@ -17,22 +17,23 @@ type getMonitorInput struct {
 }
 
 type createMonitorInput struct {
-	DisplayName              string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	MonitorType              string `json:"monitor_type" jsonschema:"one of: http, api, dns, tcp, domain (required). Use 'domain' for domain registration expiry, 'http' with ssl_cert_monitoring for HTTPS certificate expiry"`
-	URL                      string `json:"url" jsonschema:"target to check: full URL for http/api, hostname for dns/tcp/domain (required)"`
-	HTTPMethod               string `json:"http_method,omitempty" jsonschema:"HTTP method for http/api monitors (default GET)"`
-	CheckIntervalSeconds     int    `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300; plans may enforce a higher floor)"`
-	TimeoutSeconds           int    `json:"timeout_seconds,omitempty" jsonschema:"per-check timeout in seconds (default 30)"`
-	ExpectedStatusCode       int    `json:"expected_status_code,omitempty" jsonschema:"expected HTTP status for http/api monitors (default 200)"`
-	ExpectedResponseContains string `json:"expected_response_contains,omitempty" jsonschema:"alert unless the response body contains this string (http/api only)"`
-	TCPPort                  int    `json:"tcp_port,omitempty" jsonschema:"port to connect to (required for tcp monitors)"`
-	DNSRecordType            string `json:"dns_record_type,omitempty" jsonschema:"DNS record type for dns monitors: A, AAAA, CNAME, MX, TXT, NS"`
-	ExpectedDNSHost          string `json:"expected_dns_host,omitempty" jsonschema:"expected resolved value for dns monitors"`
-	SSLCertMonitoring        bool   `json:"ssl_cert_monitoring,omitempty" jsonschema:"also monitor the TLS certificate on https URLs"`
-	SSLCertExpiryAlertDays   int    `json:"ssl_cert_expiry_alert_days,omitempty" jsonschema:"alert this many days before the TLS certificate expires (default 14)"`
-	DomainExpiryAlertDays    int    `json:"domain_expiry_alert_days,omitempty" jsonschema:"for domain monitors: alert this many days before the registration expires (default 30, max 365)"`
-	ResponseTimeAlertMs      int    `json:"response_time_alert_ms,omitempty" jsonschema:"alert when successful checks are slower than this many milliseconds (http/api only; 0 = disabled)"`
-	FailureThreshold         int    `json:"failure_threshold,omitempty" jsonschema:"consecutive failures before alerting (default 3)"`
+	Locations                []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName              string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	MonitorType              string   `json:"monitor_type" jsonschema:"one of: http, api, dns, tcp, domain (required). Use 'domain' for domain registration expiry, 'http' with ssl_cert_monitoring for HTTPS certificate expiry"`
+	URL                      string   `json:"url" jsonschema:"target to check: full URL for http/api, hostname for dns/tcp/domain (required)"`
+	HTTPMethod               string   `json:"http_method,omitempty" jsonschema:"HTTP method for http/api monitors (default GET)"`
+	CheckIntervalSeconds     int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300; plans may enforce a higher floor)"`
+	TimeoutSeconds           int      `json:"timeout_seconds,omitempty" jsonschema:"per-check timeout in seconds (default 30)"`
+	ExpectedStatusCode       int      `json:"expected_status_code,omitempty" jsonschema:"expected HTTP status for http/api monitors (default 200)"`
+	ExpectedResponseContains string   `json:"expected_response_contains,omitempty" jsonschema:"alert unless the response body contains this string (http/api only)"`
+	TCPPort                  int      `json:"tcp_port,omitempty" jsonschema:"port to connect to (required for tcp monitors)"`
+	DNSRecordType            string   `json:"dns_record_type,omitempty" jsonschema:"DNS record type for dns monitors: A, AAAA, CNAME, MX, TXT, NS"`
+	ExpectedDNSHost          string   `json:"expected_dns_host,omitempty" jsonschema:"expected resolved value for dns monitors"`
+	SSLCertMonitoring        bool     `json:"ssl_cert_monitoring,omitempty" jsonschema:"also monitor the TLS certificate on https URLs"`
+	SSLCertExpiryAlertDays   int      `json:"ssl_cert_expiry_alert_days,omitempty" jsonschema:"alert this many days before the TLS certificate expires (default 14)"`
+	DomainExpiryAlertDays    int      `json:"domain_expiry_alert_days,omitempty" jsonschema:"for domain monitors: alert this many days before the registration expires (default 30, max 365)"`
+	ResponseTimeAlertMs      int      `json:"response_time_alert_ms,omitempty" jsonschema:"alert when successful checks are slower than this many milliseconds (http/api only; 0 = disabled)"`
+	FailureThreshold         int      `json:"failure_threshold,omitempty" jsonschema:"consecutive failures before alerting (default 3)"`
 }
 
 func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
@@ -62,6 +63,18 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 			return errorResult("Failed to get monitor: " + err.Error())
 		}
 		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "list_poller_locations",
+		Annotations: annReadOnly("List poller locations"),
+		Description: "List the poller locations monitors can run from: AlertKick's system locations (by region) plus the account's own on-prem pollers. Use the location_key values in the locations field of the create_*_monitor tools. A monitor created without locations runs from the account's home-region system location.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in struct{}) (*mcp.CallToolResult, any, error) {
+		data, err := c.ListPollerLocations()
+		if err != nil {
+			return errorResult("Failed to list poller locations: " + err.Error())
+		}
+		return textResult(string(data))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -124,6 +137,9 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 			payload["failure_threshold"] = in.FailureThreshold
 		}
 
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
+		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
 			return errorResult("Failed to create monitor: " + err.Error())

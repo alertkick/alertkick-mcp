@@ -17,44 +17,49 @@ import (
 )
 
 type createHTTPSMonitorInput struct {
-	DisplayName              string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	URL                      string `json:"url" jsonschema:"full URL to check, e.g. https://example.com/health (required)"`
-	CheckIntervalSeconds     int    `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300)"`
-	ExpectedStatusCode       int    `json:"expected_status_code,omitempty" jsonschema:"expected HTTP status (default 200)"`
-	ExpectedResponseContains string `json:"expected_response_contains,omitempty" jsonschema:"alert unless the response body contains this string"`
-	MonitorSSLCert           *bool  `json:"monitor_ssl_cert,omitempty" jsonschema:"also alert before the TLS certificate expires (default true for https URLs)"`
-	SSLCertExpiryAlertDays   int    `json:"ssl_cert_expiry_alert_days,omitempty" jsonschema:"days before certificate expiry to alert (default 14)"`
-	ResponseTimeAlertMs      int    `json:"response_time_alert_ms,omitempty" jsonschema:"alert when successful checks are slower than this many milliseconds (0 = disabled)"`
-	FailureThreshold         int    `json:"failure_threshold,omitempty" jsonschema:"consecutive failures before alerting (default 3)"`
+	Locations                []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName              string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	URL                      string   `json:"url" jsonschema:"full URL to check, e.g. https://example.com/health (required)"`
+	CheckIntervalSeconds     int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300)"`
+	ExpectedStatusCode       int      `json:"expected_status_code,omitempty" jsonschema:"expected HTTP status (default 200)"`
+	ExpectedResponseContains string   `json:"expected_response_contains,omitempty" jsonschema:"alert unless the response body contains this string"`
+	MonitorSSLCert           *bool    `json:"monitor_ssl_cert,omitempty" jsonschema:"also alert before the TLS certificate expires (default true for https URLs)"`
+	SSLCertExpiryAlertDays   int      `json:"ssl_cert_expiry_alert_days,omitempty" jsonschema:"days before certificate expiry to alert (default 14)"`
+	ResponseTimeAlertMs      int      `json:"response_time_alert_ms,omitempty" jsonschema:"alert when successful checks are slower than this many milliseconds (0 = disabled)"`
+	FailureThreshold         int      `json:"failure_threshold,omitempty" jsonschema:"consecutive failures before alerting (default 3)"`
 }
 
 type createDNSMonitorInput struct {
-	DisplayName          string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	Hostname             string `json:"hostname" jsonschema:"DNS name to resolve, e.g. www.example.com (required)"`
-	RecordType           string `json:"record_type,omitempty" jsonschema:"record type: A, AAAA, CNAME, MX, TXT or NS (default A)"`
-	ExpectedValue        string `json:"expected_value,omitempty" jsonschema:"alert when the record no longer resolves to this value (optional; without it the check alerts only on resolution failure, and AlertKick still tracks answer changes per location)"`
-	CheckIntervalSeconds int    `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300)"`
+	Locations            []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName          string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	Hostname             string   `json:"hostname" jsonschema:"DNS name to resolve, e.g. www.example.com (required)"`
+	RecordType           string   `json:"record_type,omitempty" jsonschema:"record type: A, AAAA, CNAME, MX, TXT or NS (default A)"`
+	ExpectedValue        string   `json:"expected_value,omitempty" jsonschema:"alert when the record no longer resolves to this value (optional; without it the check alerts only on resolution failure, and AlertKick still tracks answer changes per location)"`
+	CheckIntervalSeconds int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300)"`
 }
 
 type createDomainExpiryMonitorInput struct {
-	DisplayName           string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	Domain                string `json:"domain" jsonschema:"registrable domain to watch, e.g. example.com (required)"`
-	DomainExpiryAlertDays int    `json:"domain_expiry_alert_days,omitempty" jsonschema:"days before registration expiry to alert (default 30, max 365)"`
+	Locations             []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName           string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	Domain                string   `json:"domain" jsonschema:"registrable domain to watch, e.g. example.com (required)"`
+	DomainExpiryAlertDays int      `json:"domain_expiry_alert_days,omitempty" jsonschema:"days before registration expiry to alert (default 30, max 365)"`
 }
 
 type createMailMonitorInput struct {
-	DisplayName          string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	Domain               string `json:"domain" jsonschema:"domain that sends or receives mail, e.g. example.com (required)"`
-	RequireDmarcPolicy   string `json:"require_dmarc_policy,omitempty" jsonschema:"minimum DMARC policy to require: none, quarantine or reject (optional; the check always fails on missing SPF/DMARC, +all, PermError or a blocklist listing)"`
-	CheckIntervalSeconds int    `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 3600)"`
+	Locations            []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName          string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	Domain               string   `json:"domain" jsonschema:"domain that sends or receives mail, e.g. example.com (required)"`
+	RequireDmarcPolicy   string   `json:"require_dmarc_policy,omitempty" jsonschema:"minimum DMARC policy to require: none, quarantine or reject (optional; the check always fails on missing SPF/DMARC, +all, PermError or a blocklist listing)"`
+	CheckIntervalSeconds int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 3600)"`
 }
 
 type createTCPMonitorInput struct {
-	DisplayName          string `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	Host                 string `json:"host" jsonschema:"hostname or IP to connect to (required)"`
-	Port                 int    `json:"port" jsonschema:"TCP port to connect to (required)"`
-	CheckIntervalSeconds int    `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300)"`
-	FailureThreshold     int    `json:"failure_threshold,omitempty" jsonschema:"consecutive failures before alerting (default 3)"`
+	Locations            []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName          string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	Host                 string   `json:"host" jsonschema:"hostname or IP to connect to (required)"`
+	Port                 int      `json:"port" jsonschema:"TCP port to connect to (required)"`
+	CheckIntervalSeconds int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300)"`
+	FailureThreshold     int      `json:"failure_threshold,omitempty" jsonschema:"consecutive failures before alerting (default 3)"`
 }
 
 // RegisterMonitorTypeTools registers the typed monitor creators.
@@ -96,6 +101,9 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		if in.FailureThreshold > 0 {
 			payload["failure_threshold"] = in.FailureThreshold
 		}
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
+		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
 			return errorResult("Failed to create monitor: " + err.Error())
@@ -131,6 +139,9 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		if in.ExpectedValue != "" {
 			payload["expected_dns_host"] = in.ExpectedValue
 		}
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
+		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
 			return errorResult("Failed to create DNS monitor: " + err.Error())
@@ -160,6 +171,9 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		}
 		if in.DomainExpiryAlertDays > 0 {
 			payload["domain_expiry_alert_days"] = in.DomainExpiryAlertDays
+		}
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
 		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
@@ -192,6 +206,9 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		}
 		if in.FailureThreshold > 0 {
 			payload["failure_threshold"] = in.FailureThreshold
+		}
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
 		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
@@ -227,6 +244,9 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		}
 		if policy != "" {
 			payload["mail_require_dmarc_policy"] = policy
+		}
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
 		}
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
