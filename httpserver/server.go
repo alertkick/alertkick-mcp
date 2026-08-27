@@ -38,23 +38,7 @@ func New(cfg *config.Config, version string) *Server {
 
 // Run serves until ctx is cancelled.
 func (s *Server) Run(ctx context.Context) error {
-	streamable := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		claims, ok := r.Context().Value(claimsKey).(*AccessClaims)
-		if !ok || claims == nil {
-			// requireAuth guarantees claims; nil tells the SDK to refuse.
-			return nil
-		}
-		apiClient := client.NewTenantClient(s.cfg, s.version, claims.Subdomain, bearerFromRequest(r), claims.HasScope("write"))
-		server := mcp.NewServer(&mcp.Implementation{
-			Name:    "alertkick-mcp",
-			Version: s.version,
-		}, nil)
-		server.AddReceivingMiddleware(toolCallLogger(claims))
-		tools.RegisterAll(server, apiClient)
-		return server
-	}, &mcp.StreamableHTTPOptions{
-		Stateless: true,
-	})
+	streamable := s.streamableHandler()
 
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", s.requireAuth(streamable))
@@ -175,5 +159,27 @@ func withCORS(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// streamableHandler builds the stateless streamable-HTTP MCP handler. Split
+// out of Run so tests can exercise the transport directly.
+func (s *Server) streamableHandler() http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		claims, ok := r.Context().Value(claimsKey).(*AccessClaims)
+		if !ok || claims == nil {
+			// requireAuth guarantees claims; nil tells the SDK to refuse.
+			return nil
+		}
+		apiClient := client.NewTenantClient(s.cfg, s.version, claims.Subdomain, bearerFromRequest(r), claims.HasScope("write"))
+		server := mcp.NewServer(&mcp.Implementation{
+			Name:    "alertkick-mcp",
+			Version: s.version,
+		}, nil)
+		server.AddReceivingMiddleware(toolCallLogger(claims))
+		tools.RegisterAll(server, apiClient)
+		return server
+	}, &mcp.StreamableHTTPOptions{
+		Stateless: true,
 	})
 }
