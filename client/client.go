@@ -215,6 +215,14 @@ func (c *Client) GetMonitor(uuid string) (json.RawMessage, error) {
 
 // Monitor write operations
 
+// ListPollerLocations returns the system + customer poller locations visible
+// to the account (GET /poller-locations/all).
+func (c *Client) ListPollerLocations() (json.RawMessage, error) {
+	var result json.RawMessage
+	err := c.doJSON("GET", "/poller-locations/all", nil, &result)
+	return result, err
+}
+
 func (c *Client) CreateMonitor(payload map[string]interface{}) (json.RawMessage, error) {
 	var result json.RawMessage
 	err := c.doJSON("POST", "/monitors/create", payload, &result)

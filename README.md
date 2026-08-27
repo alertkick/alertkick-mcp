@@ -129,7 +129,8 @@ Used only when self-hosting the multi-tenant connector (this is what runs mcp.al
 |------|-------------|
 | `list_monitors` | List HTTP/TCP/DNS/SSL monitors |
 | `get_monitor` | Get detailed info for a specific monitor |
-| `create_monitor` | Create an uptime monitor (http, api, dns, tcp, or domain expiry) |
+| `list_poller_locations` | List the poller locations monitors can run from (system regions + your own pollers) |
+| `create_monitor` | Create an uptime monitor (http, api, dns, tcp, or domain expiry); all creators accept optional `locations` |
 | `create_https_monitor` | Create a website/API uptime monitor with TLS certificate expiry alerts |
 | `create_dns_monitor` | Create a DNS resolution / answer-change monitor |
 | `create_domain_expiry_monitor` | Create a domain registration expiry monitor (RDAP) |
