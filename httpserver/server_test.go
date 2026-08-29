@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -98,7 +99,8 @@ func TestSupportedProtocolVersionsAreAccepted(t *testing.T) {
 	h := s.requireAuth(s.streamableHandler())
 	token := mintTestToken(t, testKey, validClaims())
 
-	for _, version := range []string{"2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28"} {
+	// Same list the Server Card advertises, so the two cannot drift.
+	for _, version := range supportedProtocolVersions {
 		body := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 		req := httptest.NewRequest("POST", "/mcp", body)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -112,5 +114,55 @@ func TestSupportedProtocolVersionsAreAccepted(t *testing.T) {
 		if rec.Code == http.StatusBadRequest && strings.Contains(rec.Body.String(), "Unsupported protocol version") {
 			t.Errorf("protocol version %s rejected: %s", version, strings.TrimSpace(rec.Body.String()))
 		}
+	}
+}
+
+// The Server Card is fetched before any connection, so its claims must not
+// contradict what a client sees afterwards.
+func TestServerCard(t *testing.T) {
+	s := testServer()
+	req := httptest.NewRequest("GET", "/mcp/server-card", nil)
+	req.Header.Set("Accept", "application/mcp-server-card+json")
+	rec := httptest.NewRecorder()
+	http.HandlerFunc(s.serverCard).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/mcp-server-card+json" {
+		t.Errorf("Content-Type = %q, want application/mcp-server-card+json", ct)
+	}
+
+	var card map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil {
+		t.Fatalf("card is not valid JSON: %v", err)
+	}
+	for _, k := range []string{"$schema", "name", "description", "version"} {
+		if card[k] == nil || card[k] == "" {
+			t.Errorf("required field %q missing or empty", k)
+		}
+	}
+	// Reverse-DNS with exactly one slash, per the schema pattern.
+	name, _ := card["name"].(string)
+	if strings.Count(name, "/") != 1 {
+		t.Errorf("name = %q, must contain exactly one slash", name)
+	}
+	// A leading "v" is not semver and the schema asks for semver.
+	if v, _ := card["version"].(string); strings.HasPrefix(v, "v") {
+		t.Errorf("version = %q, should not carry a leading v", v)
+	}
+
+	remotes, _ := card["remotes"].([]interface{})
+	if len(remotes) != 1 {
+		t.Fatalf("want exactly one remote, got %d", len(remotes))
+	}
+	r0, _ := remotes[0].(map[string]interface{})
+	if r0["type"] != "streamable-http" {
+		t.Errorf("remote type = %v, want streamable-http", r0["type"])
+	}
+	got, _ := r0["supportedProtocolVersions"].([]interface{})
+	if len(got) != len(supportedProtocolVersions) {
+		t.Errorf("card advertises %d protocol versions, server accepts %d",
+			len(got), len(supportedProtocolVersions))
 	}
 }

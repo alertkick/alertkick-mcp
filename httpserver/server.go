@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"alertkick-mcp/client"
@@ -42,6 +43,9 @@ func (s *Server) Run(ctx context.Context) error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", s.requireAuth(streamable))
+	// Pre-connection discovery, so deliberately unauthenticated. The path is
+	// the one MCP reserves: <streamable-http-url>/server-card.
+	mux.HandleFunc("/mcp/server-card", s.serverCard)
 	mux.HandleFunc("/.well-known/oauth-protected-resource", s.protectedResourceMetadata)
 	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", s.protectedResourceMetadata)
 	mux.HandleFunc("/healthz", s.health)
@@ -128,6 +132,67 @@ func (s *Server) protectedResourceMetadata(w http.ResponseWriter, r *http.Reques
 		"bearer_methods_supported": []string{"header"},
 		"resource_name":            "AlertKick",
 		"resource_documentation":   s.cfg.DocsURL,
+	})
+}
+
+// serverCard serves this server's MCP Server Card (SEP-2127) at the reserved
+// <streamable-http-url>/server-card location.
+//
+// Deliberately NOT under /.well-known: the spec calls that out as wrong for a
+// single server's card, since .well-known is for site-wide metadata. The
+// site-wide half is the AI Catalog at alertkick.com/.well-known/ai-catalog.json,
+// which points here.
+//
+// Primitives (tools) are omitted on purpose - the spec excludes them because
+// what a server exposes varies per authenticated user, and a static list would
+// drift. Version comes from the running binary so the card cannot contradict
+// the serverInfo a client sees after connecting.
+// supportedProtocolVersions is what the Server Card advertises and what
+// TestSupportedProtocolVersionsAreAccepted asserts the SDK actually accepts, so
+// the card cannot claim a version the server would reject.
+var supportedProtocolVersions = []string{"2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28"}
+
+func (s *Server) serverCard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/mcp-server-card+json")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	// Browser-based clients fetch this before any credentialed call.
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"$schema":     "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+		"name":        "com.alertkick/alertkick-mcp",
+		"title":       "AlertKick",
+		"description": "Uptime, infrastructure and security monitoring. Create and manage HTTP, DNS, TCP, certificate-expiry, domain-expiry and mail-posture monitors, cron-job heartbeats, on-call rosters and escalation policies; read and acknowledge alerts, incidents and eBPF security events; raise and approve change windows. Scoped to a single workspace.",
+		"version":     strings.TrimPrefix(s.version, "v"),
+		"websiteUrl":  "https://alertkick.com",
+		"repository": map[string]string{
+			"url":    "https://github.com/alertkick/alertkick-mcp",
+			"source": "github",
+		},
+		"icons": []map[string]string{
+			{"src": "https://alertkick.com/logo.png", "mimeType": "image/png"},
+		},
+		"remotes": []map[string]interface{}{
+			{
+				"type":                      "streamable-http",
+				"url":                       s.cfg.Resource(),
+				"supportedProtocolVersions": supportedProtocolVersions,
+			},
+		},
+		"_meta": map[string]interface{}{
+			"com.alertkick": map[string]interface{}{
+				"documentationUrl": s.cfg.DocsURL,
+				"webmcp": map[string]string{
+					"description":      "The same tools are also published in-page over WebMCP, so an agent in the user's browser can call them in the existing logged-in session with no connector and no API key. WebMCP has no declarative discovery of its own, which is why it is mentioned here.",
+					"package":          "https://github.com/alertkick/alertkick-webmcp",
+					"documentationUrl": "https://alertkick.com/docs/getting-started/webmcp-browser/",
+				},
+			},
+		},
 	})
 }
 
