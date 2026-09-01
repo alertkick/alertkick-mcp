@@ -4,6 +4,7 @@ import (
 	"alertkick-mcp/config"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -61,6 +62,51 @@ func NewTenantClient(cfg *config.Config, version, tenant, bearerToken string, wr
 // CanWrite reports whether this connection may call write tools.
 func (c *Client) CanWrite() bool { return c.writeAllowed }
 
+// APIError is what doJSON returns for any non-2xx response. Tools that
+// want to turn a plan-limit 402 into a sentence a person can act on branch
+// on Status with errors.As; everything else keeps using Error(), whose text
+// is unchanged from before this type existed.
+type APIError struct {
+	Status int
+	Body   []byte
+	Method string
+	Path   string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("API returned status %d: %s", e.Status, string(e.Body))
+}
+
+// PlanLimitError is the body the api sends with a 402 when a plan limit
+// blocks a create (hosts/add, monitors/create, heartbeats/create) or when
+// the workspace has no plan at all (subscription_required).
+type PlanLimitError struct {
+	Error      string `json:"error"`
+	Message    string `json:"message"`
+	UpgradeURL string `json:"upgrade_url"`
+	Usage      *struct {
+		ResourceType string `json:"resource_type"`
+		Current      int64  `json:"current"`
+		Limit        int    `json:"limit"`
+		LimitReached bool   `json:"limit_reached"`
+		Unlimited    bool   `json:"unlimited"`
+	} `json:"usage"`
+}
+
+// AsPlanLimit decodes a 402 body. ok is false for any other status or an
+// undecodable body, so callers fall back to the raw error text.
+func AsPlanLimit(err error) (*PlanLimitError, bool) {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusPaymentRequired {
+		return nil, false
+	}
+	var pl PlanLimitError
+	if jerr := json.Unmarshal(apiErr.Body, &pl); jerr != nil || pl.Error == "" {
+		return nil, false
+	}
+	return &pl, true
+}
+
 func (c *Client) doJSON(method, path string, body interface{}, result interface{}) error {
 	var bodyReader io.Reader
 	if body != nil {
@@ -102,7 +148,7 @@ func (c *Client) doJSON(method, path string, body interface{}, result interface{
 
 	if resp.StatusCode >= 400 {
 		log.Printf("[client] %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
-		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(respBody))
+		return &APIError{Status: resp.StatusCode, Body: respBody, Method: method, Path: path}
 	}
 
 	if result != nil && len(respBody) > 0 {
@@ -142,6 +188,61 @@ func (c *Client) GetHostContainers(uuid string) (json.RawMessage, error) {
 	var result json.RawMessage
 	err := c.doGet("/hosts/"+uuid+"/containers", nil, &result)
 	return result, err
+}
+
+// AddHost registers a server record and its agent token. The api answers
+// 402 (agent_limit_reached) when the plan has no free server seat, which
+// on the Free plan means zero seats: agent-based monitoring is a trial /
+// paid-plan feature.
+func (c *Client) AddHost(serverName, escalationPolicyUUID string) (json.RawMessage, error) {
+	payload := map[string]interface{}{"server_name": serverName}
+	if escalationPolicyUUID != "" {
+		payload["escalation_policy_uuid"] = escalationPolicyUUID
+	}
+	var result json.RawMessage
+	err := c.doJSON("POST", "/hosts/add", payload, &result)
+	return result, err
+}
+
+// InstallInstruction mirrors the api's install-instructions item: Command
+// is the one-liner for Linux, Content is a full script (Windows).
+type InstallInstruction struct {
+	Heading string `json:"heading"`
+	Command string `json:"command"`
+	Content string `json:"content"`
+}
+
+type AgentInstallInstructions struct {
+	Instructions []InstallInstruction `json:"instructions"`
+}
+
+// GetUniversalInstallCommand returns the OS-detecting `curl | sh` install
+// command for a host. The signed URL inside it is valid for 24 hours; call
+// again for a fresh one.
+func (c *Client) GetUniversalInstallCommand(hostUUID string) (*AgentInstallInstructions, error) {
+	var result AgentInstallInstructions
+	err := c.doGet("/hosts/"+hostUUID+"/agent-install-universal", nil, &result)
+	return &result, err
+}
+
+// BillingUsage is the subset of GET /billing/usage the tools need to tell
+// a user which plan they are on and how many seats remain.
+type BillingUsage struct {
+	Usage map[string]struct {
+		Current   int64 `json:"current"`
+		Limit     int   `json:"limit"`
+		Unlimited bool  `json:"unlimited"`
+	} `json:"usage"`
+	Plan struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"plan"`
+}
+
+func (c *Client) GetBillingUsage() (*BillingUsage, error) {
+	var result BillingUsage
+	err := c.doGet("/billing/usage", nil, &result)
+	return &result, err
 }
 
 // Alerts

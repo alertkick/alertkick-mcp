@@ -19,8 +19,8 @@ type getMonitorInput struct {
 type createMonitorInput struct {
 	Locations                []string `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
 	DisplayName              string   `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
-	MonitorType              string   `json:"monitor_type" jsonschema:"one of: http, api, dns, tcp, domain (required). Use 'domain' for domain registration expiry, 'http' with ssl_cert_monitoring for HTTPS certificate expiry"`
-	URL                      string   `json:"url" jsonschema:"target to check: full URL for http/api, hostname for dns/tcp/domain (required)"`
+	MonitorType              string   `json:"monitor_type" jsonschema:"one of: http, api, dns, tcp, domain, mail (required). Use 'domain' for domain registration expiry, 'http' with ssl_cert_monitoring for HTTPS certificate expiry"`
+	URL                      string   `json:"url" jsonschema:"target to check: full URL for http/api, hostname for dns/tcp, registrable domain for domain/mail (required)"`
 	HTTPMethod               string   `json:"http_method,omitempty" jsonschema:"HTTP method for http/api monitors (default GET)"`
 	CheckIntervalSeconds     int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 300; plans may enforce a higher floor)"`
 	TimeoutSeconds           int      `json:"timeout_seconds,omitempty" jsonschema:"per-check timeout in seconds (default 30)"`
@@ -80,7 +80,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_monitor",
 		Annotations: annWrite("Create monitor", false, false),
-		Description: "Create an uptime monitor. Types: 'http'/'api' check a URL (optionally with ssl_cert_monitoring for HTTPS certificate expiry), 'dns' checks record resolution, 'tcp' checks a port, 'domain' checks domain registration expiry. Only display_name, monitor_type and url are required; sensible defaults cover the rest. Alerts route to the account's default escalation policy.",
+		Description: "Generic monitor creator; prefer the typed tools (create_https_monitor, create_dns_monitor, create_tcp_monitor, create_domain_expiry_monitor, create_mail_monitor) when one fits. Types: 'http'/'api' check a URL (optionally with ssl_cert_monitoring for HTTPS certificate expiry), 'dns' checks record resolution, 'tcp' checks a port, 'domain' checks domain registration expiry, 'mail' checks a domain's email posture (MX/SPF/DMARC/DKIM/blocklists). Only display_name, monitor_type and url are required (url is the hostname or domain for dns/tcp/domain/mail); sensible defaults cover the rest. Alerts route to the account's default escalation policy.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in createMonitorInput) (*mcp.CallToolResult, any, error) {
 		if res, out, gerr := requireWrite(c); res != nil {
 			return res, out, gerr
@@ -89,7 +89,7 @@ func RegisterMonitorTools(s *mcp.Server, c *client.Client) {
 			return errorResult("display_name is required")
 		}
 		if in.MonitorType == "" {
-			return errorResult("monitor_type is required (http, api, dns, tcp, or domain)")
+			return errorResult("monitor_type is required (http, api, dns, tcp, domain, or mail)")
 		}
 		if in.URL == "" {
 			return errorResult("url is required")

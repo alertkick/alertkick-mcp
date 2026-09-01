@@ -106,6 +106,8 @@ Used only when self-hosting the multi-tenant connector (this is what runs mcp.al
 ### Servers
 | Tool | Description |
 |------|-------------|
+| `add_server` | Register a server for agent-based monitoring and get the one-line install command (trial and paid plans; the Free plan has no server seats) |
+| `get_server_install_command` | Fetch the install command again for a server whose agent is not reporting yet |
 | `list_servers` | List all monitored servers with status, hostname, OS info |
 | `get_server` | Get detailed info for a specific server |
 | `get_server_containers` | Get Docker containers running on a server |
@@ -130,11 +132,12 @@ Used only when self-hosting the multi-tenant connector (this is what runs mcp.al
 | `list_monitors` | List HTTP/TCP/DNS/SSL monitors |
 | `get_monitor` | Get detailed info for a specific monitor |
 | `list_poller_locations` | List the poller locations monitors can run from (system regions + your own pollers) |
-| `create_monitor` | Create an uptime monitor (http, api, dns, tcp, or domain expiry); all creators accept optional `locations` |
+| `create_monitor` | Generic creator (http, api, dns, tcp, domain expiry, or mail); all creators accept optional `locations` |
 | `create_https_monitor` | Create a website/API uptime monitor with TLS certificate expiry alerts |
 | `create_dns_monitor` | Create a DNS resolution / answer-change monitor |
 | `create_domain_expiry_monitor` | Create a domain registration expiry monitor (RDAP) |
 | `create_tcp_monitor` | Create a TCP port monitor |
+| `create_mail_monitor` | Create an email deliverability monitor (MX, SPF, DMARC, DKIM, MTA-STS, blocklists) |
 | `pause_monitor` | Pause a monitor's checks and alerting |
 | `resume_monitor` | Resume a paused monitor |
 | `delete_monitor` | Permanently delete a monitor |
