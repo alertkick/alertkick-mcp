@@ -53,8 +53,16 @@ func isHealthPath(p string) bool {
 	return p == "/healthz" || p == "/livez" || p == "/readyz"
 }
 
+// claimsHolder lets requireAuth report the verified claims back to
+// withAccessLog. requireAuth runs inside the mux and hands the claims to a
+// derived request context, which the outer access-log middleware never sees;
+// the holder is a pointer shared by both.
+type claimsHolder struct {
+	claims *AccessClaims
+}
+
 // withAccessLog logs every non-health HTTP request. Tenant/user come from
-// the verified claims placed on the context by requireAuth, so an
+// the verified claims requireAuth stores in the claimsHolder, so an
 // unauthenticated 401 logs with empty tenant fields.
 func withAccessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +72,8 @@ func withAccessLog(next http.Handler) http.Handler {
 		}
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w}
-		next.ServeHTTP(rec, r)
+		holder := &claimsHolder{}
+		next.ServeHTTP(rec, r.WithContext(context.WithValue(r.Context(), claimsHolderKey, holder)))
 
 		entry := map[string]any{
 			"msg":          "request",
@@ -78,7 +87,7 @@ func withAccessLog(next http.Handler) http.Handler {
 			"client_ip":    clientIP(r),
 			"user_agent":   r.UserAgent(),
 		}
-		if c, ok := r.Context().Value(claimsKey).(*AccessClaims); ok && c != nil {
+		if c := holder.claims; c != nil {
 			entry["tenant"] = c.Subdomain
 			entry["username"] = c.Username
 			entry["client_id"] = c.ClientID

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -85,6 +86,40 @@ func TestAccessLogPassesStatusThrough(t *testing.T) {
 	}
 	if got := clientIP(req); got != "203.0.113.9" {
 		t.Fatalf("clientIP = %q, want first XFF hop", got)
+	}
+}
+
+// The access log wraps the mux while requireAuth runs inside it, so the
+// tenant only reaches the log line through the shared claimsHolder. Prod
+// logged every request without a tenant until this was wired up.
+func TestAccessLogCarriesTenantFromRequireAuth(t *testing.T) {
+	var buf bytes.Buffer
+	orig := jsonLog
+	jsonLog = json.NewEncoder(&buf)
+	defer func() { jsonLog = orig }()
+
+	s := testServer()
+	h := withAccessLog(s.requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})))
+	req := httptest.NewRequest("POST", "/mcp", nil)
+	req.Header.Set("Authorization", "Bearer "+mintTestToken(t, testKey, validClaims()))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("access log line not JSON: %v (%q)", err, buf.String())
+	}
+	if entry["tenant"] != "acme" {
+		t.Fatalf("tenant = %v, want acme (%s)", entry["tenant"], buf.String())
+	}
+
+	buf.Reset()
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/mcp", nil))
+	entry = nil
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("access log line not JSON: %v (%q)", err, buf.String())
+	}
+	if _, ok := entry["tenant"]; ok {
+		t.Fatalf("unauthenticated request logged a tenant: %s", buf.String())
 	}
 }
 
