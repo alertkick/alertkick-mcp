@@ -25,7 +25,10 @@ import (
 
 type ctxKey string
 
-const claimsKey ctxKey = "akmcp_claims"
+const (
+	claimsKey       ctxKey = "akmcp_claims"
+	claimsHolderKey ctxKey = "akmcp_claims_holder"
+)
 
 // Server wires the streamable handler, metadata and health endpoints.
 type Server struct {
@@ -101,6 +104,9 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		if err != nil {
 			s.unauthorized(w, "invalid_token")
 			return
+		}
+		if h, ok := r.Context().Value(claimsHolderKey).(*claimsHolder); ok {
+			h.claims = claims
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), claimsKey, claims)))
 	})
