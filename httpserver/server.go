@@ -172,7 +172,7 @@ func (s *Server) serverCard(w http.ResponseWriter, r *http.Request) {
 		"$schema":     "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
 		"name":        "com.alertkick/alertkick-mcp",
 		"title":       "AlertKick",
-		"description": "Uptime, infrastructure and security monitoring. Create and manage HTTP, DNS, TCP, certificate-expiry, domain-expiry and mail-posture monitors, cron-job heartbeats, on-call rosters and escalation policies; read and acknowledge alerts, incidents and eBPF security events; raise and approve change windows. Scoped to a single workspace.",
+		"description": "Uptime, infrastructure and security monitoring. Create and manage HTTP, DNS, TCP, certificate-expiry, domain-expiry, mail-posture and MCP-server monitors, cron-job heartbeats, on-call rosters and escalation policies; read and acknowledge alerts, incidents and eBPF security events; raise and approve change windows. Scoped to a single workspace.",
 		"version":     strings.TrimPrefix(s.version, "v"),
 		"websiteUrl":  "https://alertkick.com",
 		"repository": map[string]string{

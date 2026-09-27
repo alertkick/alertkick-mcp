@@ -5,12 +5,13 @@ package tools
 // give assistants an obvious, hard-to-misuse path for the monitoring jobs
 // people actually ask for: "watch this HTTPS endpoint and its cert",
 // "watch this DNS record", "tell me before the domain expires",
-// "check this port stays open".
+// "check this port stays open", "tell me if this MCP server's tools change".
 
 import (
 	"alertkick-mcp/client"
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -51,6 +52,20 @@ type createMailMonitorInput struct {
 	Domain               string   `json:"domain" jsonschema:"domain that sends or receives mail, e.g. example.com (required)"`
 	RequireDmarcPolicy   string   `json:"require_dmarc_policy,omitempty" jsonschema:"minimum DMARC policy to require: none, quarantine or reject (optional; the check always fails on missing SPF/DMARC, +all, PermError or a blocklist listing)"`
 	CheckIntervalSeconds int      `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 3600)"`
+}
+
+type createMCPMonitorInput struct {
+	Locations            []string          `json:"locations,omitempty" jsonschema:"poller location keys to check from (optional; defaults to the account's home-region location; use list_poller_locations to see the keys)"`
+	DisplayName          string            `json:"display_name" jsonschema:"human-readable name for the monitor (required)"`
+	URL                  string            `json:"url" jsonschema:"the MCP endpoint URL, e.g. https://mcp.example.com/mcp (required)"`
+	Transport            string            `json:"transport,omitempty" jsonschema:"streamable-http (default) or sse for legacy HTTP+SSE servers"`
+	AuthMode             string            `json:"auth_mode,omitempty" jsonschema:"none (default), header (static headers such as Authorization or X-API-Key), or oauth (checks the OAuth discovery chain only; no login, so the tool list is not checked)"`
+	Headers              map[string]string `json:"headers,omitempty" jsonschema:"header name -> value, only for auth_mode header; values are stored encrypted. Secrets can also be added later in the AlertKick web app instead of here"`
+	DriftPolicy          string            `json:"drift_policy,omitempty" jsonschema:"alert (default): changes since the approved baseline fail the check; record: changes are logged as events only"`
+	ExpectedTools        []string          `json:"expected_tools,omitempty" jsonschema:"tool names that must be present; a missing one fails the check"`
+	MaxTools             int               `json:"max_tools,omitempty" jsonschema:"fail when the server lists more tools than this (0 = no cap)"`
+	CheckIntervalSeconds int               `json:"check_interval_seconds,omitempty" jsonschema:"seconds between checks (default 600)"`
+	TimeoutSeconds       int               `json:"timeout_seconds,omitempty" jsonschema:"per-check timeout in seconds (default 20)"`
 }
 
 type createTCPMonitorInput struct {
@@ -251,6 +266,96 @@ func RegisterMonitorTypeTools(s *mcp.Server, c *client.Client) {
 		data, err := c.CreateMonitor(payload)
 		if err != nil {
 			return errorResult("Failed to create mail monitor: " + err.Error())
+		}
+		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
+	})
+
+	// create_mcp_monitor deliberately has no counterpart that accepts a
+	// changed tool surface: approving a new baseline is human-only (web app
+	// session), because an agent must not be able to approve the tool
+	// changes that would steer it. The API refuses it for API keys and MCP
+	// callers too. Do not add an accept/approve baseline tool here.
+	mcpAnn := annWrite("Create MCP server monitor", false, false)
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "create_mcp_monitor",
+		Annotations: mcpAnn,
+		Description: "Create a monitor for a remote MCP server (Streamable HTTP or legacy SSE). Each check runs the MCP handshake and tools/list (following pagination) and never calls a tool. It fingerprints every tool, lints tool text for poisoning patterns (hidden Unicode, injected instructions, sensitive file paths, cross-tool steering, encoded blobs) and records handshake and list latency. The first tool list seen becomes the approved baseline. Any later change to the tool set, a tool's description, title, schema or safety annotations, or the server instructions fails the check and keeps alerting until a person reviews and accepts it in the AlertKick web app; accepting changes cannot be done over MCP or with an API key. drift_policy 'record' logs changes as events without failing. auth_mode 'header' sends static headers (stored encrypted); 'oauth' checks only the server's OAuth discovery chain (401 challenge, protected-resource and authorization-server metadata, issuer match, PKCE S256, client registration) because OAuth login is not supported yet, so the tool list is not checked in that mode.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in createMCPMonitorInput) (*mcp.CallToolResult, any, error) {
+		if res, out, gerr := requireWrite(c); res != nil {
+			return res, out, gerr
+		}
+		endpoint := strings.TrimSpace(in.URL)
+		if in.DisplayName == "" || endpoint == "" {
+			return errorResult("display_name and url are required")
+		}
+		if u, err := url.Parse(endpoint); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return errorResult("url must be the MCP endpoint as an http(s) URL, e.g. https://mcp.example.com/mcp")
+		}
+		transport := strings.ToLower(strings.TrimSpace(defaultString(in.Transport, "streamable-http")))
+		switch transport {
+		case "streamable-http", "sse":
+		default:
+			return errorResult("transport must be streamable-http or sse")
+		}
+		authMode := strings.ToLower(strings.TrimSpace(in.AuthMode))
+		if authMode == "" {
+			authMode = "none"
+			if len(in.Headers) > 0 {
+				authMode = "header"
+			}
+		}
+		switch authMode {
+		case "none", "oauth":
+			if len(in.Headers) > 0 {
+				return errorResult("headers are only used with auth_mode header")
+			}
+		case "header":
+			if len(in.Headers) == 0 {
+				return errorResult("auth_mode header needs at least one entry in headers (e.g. Authorization or X-API-Key)")
+			}
+		default:
+			return errorResult("auth_mode must be none, header or oauth")
+		}
+		driftPolicy := strings.ToLower(strings.TrimSpace(defaultString(in.DriftPolicy, "alert")))
+		switch driftPolicy {
+		case "alert", "record":
+		default:
+			return errorResult("drift_policy must be alert or record")
+		}
+		if in.MaxTools < 0 {
+			return errorResult("max_tools must be 0 (no cap) or more")
+		}
+		payload := map[string]interface{}{
+			"display_name":           in.DisplayName,
+			"monitor_type":           "mcp",
+			"url":                    endpoint,
+			"timeout_seconds":        defaultInt(in.TimeoutSeconds, 20),
+			"check_interval_seconds": defaultInt(in.CheckIntervalSeconds, 600),
+			"mcp_transport":          transport,
+			"mcp_auth_mode":          authMode,
+			"mcp_drift_policy":       driftPolicy,
+		}
+		if authMode == "header" {
+			payload["mcp_headers"] = in.Headers
+		}
+		var expected []string
+		for _, t := range in.ExpectedTools {
+			if t = strings.TrimSpace(t); t != "" {
+				expected = append(expected, t)
+			}
+		}
+		if len(expected) > 0 {
+			payload["mcp_expected_tools"] = expected
+		}
+		if in.MaxTools > 0 {
+			payload["mcp_max_tools"] = in.MaxTools
+		}
+		if len(in.Locations) > 0 {
+			payload["locations"] = in.Locations
+		}
+		data, err := c.CreateMonitor(payload)
+		if err != nil {
+			return errorResult("Failed to create MCP server monitor: " + err.Error())
 		}
 		return textResult(string(data) + uiLinkLine(c, data, "/monitors/"))
 	})

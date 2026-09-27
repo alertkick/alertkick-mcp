@@ -59,7 +59,7 @@ AI Tool (Claude Desktop / Cursor / etc.)
 }
 ```
 
-4. Restart Claude Desktop. You should see 34 AlertKick tools available.
+4. Restart Claude Desktop. You should see 39 AlertKick tools available.
 
 ### Claude Code
 
@@ -129,15 +129,16 @@ Used only when self-hosting the multi-tenant connector (this is what runs mcp.al
 ### Monitors
 | Tool | Description |
 |------|-------------|
-| `list_monitors` | List HTTP/TCP/DNS/SSL monitors |
+| `list_monitors` | List monitors (HTTP, TCP, DNS, SSL, domain, mail, MCP server) |
 | `get_monitor` | Get detailed info for a specific monitor |
 | `list_poller_locations` | List the poller locations monitors can run from (system regions + your own pollers) |
-| `create_monitor` | Generic creator (http, api, dns, tcp, domain expiry, or mail); all creators accept optional `locations` |
+| `create_monitor` | Generic creator (http, api, dns, tcp, domain expiry, mail, or mcp); all creators accept optional `locations` |
 | `create_https_monitor` | Create a website/API uptime monitor with TLS certificate expiry alerts |
 | `create_dns_monitor` | Create a DNS resolution / answer-change monitor |
 | `create_domain_expiry_monitor` | Create a domain registration expiry monitor (RDAP) |
 | `create_tcp_monitor` | Create a TCP port monitor |
 | `create_mail_monitor` | Create an email deliverability monitor (MX, SPF, DMARC, DKIM, MTA-STS, blocklists) |
+| `create_mcp_monitor` | Create an MCP server monitor (handshake, tool-list drift against an approved baseline, tool-poisoning lint, OAuth discovery chain). Accepting tool changes is human-only, in the web app |
 | `pause_monitor` | Pause a monitor's checks and alerting |
 | `resume_monitor` | Resume a paused monitor |
 | `delete_monitor` | Permanently delete a monitor |
